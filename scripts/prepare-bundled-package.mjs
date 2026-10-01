@@ -7,7 +7,25 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
-export function materializePublishManifest(pkg) {
+/**
+ * Versions of the release-manifest workspace packages, keyed by package name.
+ * Releases stamp every package with one version, but a git checkout keeps each
+ * package's own version (e.g. @paperclipai/plugin-sdk is 1.0.0 while the
+ * server is 0.3.1), so workspace references must resolve per dependency.
+ */
+export function readWorkspacePackageVersions(sourceRoot = repoRoot) {
+  const manifestPath = resolve(sourceRoot, "scripts", "release-package-manifest.json");
+  if (!existsSync(manifestPath)) return new Map();
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  return new Map(
+    manifest.map(({ dir, name }) => [
+      name,
+      JSON.parse(readFileSync(resolve(sourceRoot, dir, "package.json"), "utf8")).version,
+    ]),
+  );
+}
+
+export function materializePublishManifest(pkg, workspaceVersions = new Map()) {
   const publishConfig = pkg.publishConfig ?? {};
   const publishManifest = { ...pkg };
 
@@ -22,7 +40,7 @@ export function materializePublishManifest(pkg) {
         if (typeof specifier !== "string" || !specifier.startsWith("workspace:")) return [name, specifier];
         const range = specifier.slice("workspace:".length);
         const prefix = range === "^" || range === "~" ? range : "";
-        return [name, `${prefix}${pkg.version}`];
+        return [name, `${prefix}${workspaceVersions.get(name) ?? pkg.version}`];
       }),
     );
   }
@@ -156,7 +174,10 @@ export function prepareBundledPackage(sourceDir, destinationDir, { sourceRoot = 
   }
 
   const deployedPackagePath = resolve(destinationDir, "package.json");
-  const publishManifest = materializePublishManifest(sourcePackage);
+  const publishManifest = materializePublishManifest(
+    sourcePackage,
+    readWorkspacePackageVersions(sourceRoot),
+  );
   const installManifest = createBundledInstallManifest(publishManifest, bundledDependencies);
   writeFileSync(deployedPackagePath, `${JSON.stringify(installManifest, null, 2)}\n`);
 
