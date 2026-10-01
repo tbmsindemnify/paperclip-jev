@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Opens Paperclip (managed install of tbmsindemnify/paperclip-jev, run by the
+# systemd user service paperclipai.service) as an Omarchy web app. Starts the
+# service first if it is not running, then opens the URL the server reports.
+set -uo pipefail
+
+service=paperclipai.service
+info="$HOME/.paperclip/instances/default/runtime-info.json"
+fallback_url="http://127.0.0.1:3100"
+
+if ! systemctl --user is-active --quiet "$service"; then
+  if ! systemctl --user start "$service"; then
+    notify-send "Paperclip" "Could not start $service. Check: journalctl --user -u $service"
+    exit 1
+  fi
+fi
+
+url=""
+for _ in $(seq 1 60); do
+  candidate=$(jq -r '.dashboardUrl // empty' "$info" 2>/dev/null)
+  if [[ -n $candidate ]] && curl -fsS --max-time 2 "$candidate/api/health" >/dev/null 2>&1; then
+    url=$candidate
+    break
+  fi
+  sleep 0.5
+done
+
+if [[ -z $url ]]; then
+  notify-send "Paperclip" "Paperclip is still starting; opening $fallback_url"
+  url=$fallback_url
+fi
+
+exec omarchy-launch-webapp "$url"
