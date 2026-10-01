@@ -203,6 +203,15 @@ describe("managed install commands", () => {
     expect(firstPack).toBeGreaterThan(stageArtifacts);
   });
 
+  it("packs staged bundled packages without rerunning their lifecycle scripts", async () => {
+    const sha = "e".repeat(40);
+    const runCommand = createGitCheckoutRunCommand(sha);
+    await installGitPayload("paperclipai/paperclip", sha, runCommand, resolveInstallStorePaths());
+    const stagedPacks = runCommand.mock.calls.filter(([file, args]) => file === "npm" && args[0] === "pack" && args[1]?.includes("workspace-package-"));
+    expect(stagedPacks).toHaveLength(1);
+    expect(stagedPacks[0]?.[1]).toContain("--ignore-scripts");
+  });
+
   it("resolves the complete server workspace dependency closure in dependency order", () => {
     const checkout = path.join(root, "checkout");
     const packages = [
