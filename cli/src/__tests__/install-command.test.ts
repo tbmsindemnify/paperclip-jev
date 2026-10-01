@@ -178,7 +178,7 @@ describe("managed install commands", () => {
       file === "corepack" ||
       (file === "npm" && args[0] === "pack") ||
       (file === process.execPath && args[0]?.endsWith("prepare-bundled-package.mjs")));
-    expect(buildCalls).toHaveLength(9);
+    expect(buildCalls).toHaveLength(10);
     for (const call of buildCalls) {
       const env = call[2]?.env;
       expect(env, `${call[0]} ${call[1].join(" ")} must run with an explicit env`).toBeDefined();
@@ -186,6 +186,21 @@ describe("managed install commands", () => {
     }
     const uiPackCall = buildCalls.find(([file, , options]) => file === "corepack" && options?.env?.PAPERCLIP_RELEASE_REUSE_UI_DIST === "1");
     expect(uiPackCall).toBeDefined();
+  });
+
+  it("stages packaged artifacts after the server build and before packing", async () => {
+    const sha = "f".repeat(40);
+    const runCommand = createGitCheckoutRunCommand(sha);
+    await installGitPayload("paperclipai/paperclip", sha, runCommand, resolveInstallStorePaths());
+    const calls = runCommand.mock.calls;
+    const serverBuild = calls.findIndex(([file, args]) => file === "corepack" && args.includes("@paperclipai/server..."));
+    const stageArtifacts = calls.findIndex(([file, args]) => file === "bash" && args[0] === "scripts/prepare-packaged-artifacts.sh");
+    const firstPack = calls.findIndex(([file, args]) =>
+      (file === "corepack" && args.includes("pack")) ||
+      (file === process.execPath && args[0]?.endsWith("prepare-bundled-package.mjs")));
+    expect(serverBuild).toBeGreaterThan(-1);
+    expect(stageArtifacts).toBeGreaterThan(serverBuild);
+    expect(firstPack).toBeGreaterThan(stageArtifacts);
   });
 
   it("resolves the complete server workspace dependency closure in dependency order", () => {
