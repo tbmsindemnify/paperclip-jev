@@ -48,6 +48,31 @@ omarchy-webapp-install "Paperclip" "http://127.0.0.1:3100" \
 `/api/health`, and opens the dashboard URL from the instance's
 `runtime-info.json` with `omarchy-launch-webapp`.
 
+## Agent team
+
+`agents/` defines the TBM team: company, shared `tbm-vault` skill (the Obsidian
+vault is the source of truth), a project whose workspace is the vault, and three
+agents. Put the vault under git first so agent edits are reviewable.
+
+| Agent | Runtime | Model | Owns |
+|---|---|---|---|
+| Claims Desk | `claude_local` | Claude Opus 5.5, effort high | Document filing, PDF forms, estimates and supplements, carrier drafts |
+| Claims Review | `codex_local` | GPT-5.5, reasoning high | Fact, support, math and Texas-rules review before anything reaches Tyler |
+| Growth | `claude_local` | Claude Opus 5.5, effort medium | Contractor prospecting, outreach drafts, content |
+
+Claims Review runs on a different model family from Claims Desk so their errors
+are less likely to coincide. Every agent drafts; Tyler approves anything outbound.
+
+The Claude agents use `engine: "cli"`, which runs the installed `claude` CLI.
+The default ACP engine bundles Claude Code 2.1.257, which rejects
+`claude-opus-5-5` (it needs 2.1.280 or newer).
+
+```sh
+cd deploy/omarchy/agents
+VAULT="$HOME/path/to/TBM Knowledge Hub" ./setup-team.sh   # create the team
+VAULT="$HOME/path/to/TBM Knowledge Hub" ./smoke-team.sh   # read-only checks
+```
+
 ## Jev task routing
 
 Add to `~/.paperclip/instances/default/.env` (never commit the key), then

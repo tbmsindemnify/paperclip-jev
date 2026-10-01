@@ -1,0 +1,58 @@
+{
+  "company": {
+    "name": "TBM Public Adjusters",
+    "description": "Texas public adjusting firm. The TBM Knowledge Hub vault is the source of truth; agents draft, Tyler approves anything outbound."
+  },
+  "project": {
+    "name": "TBM Knowledge Hub",
+    "description": "Claims, carriers and growth work for TBM Public Adjusters. Runs start in the vault."
+  },
+  "skill": {
+    "file": "tbm-vault.SKILL.md",
+    "name": "tbm-vault",
+    "description": "The TBM Knowledge Hub vault is the source of truth: read it first, cite it, write back, and get Tyler's approval for anything outbound."
+  },
+  "agents": [
+    {
+      "file": "claims-desk.AGENTS.md",
+      "name": "Claims Desk",
+      "role": "general",
+      "title": "Claims Operations",
+      "capabilities": "Claim paperwork for a Texas public adjuster: sorts and files incoming claim documents into the right claim dossier, fills PDF claim forms (letters of representation, proof of loss, carrier forms), drafts Xactimate-ready line-item estimates and supplements, and drafts emails and letters to insurance carriers. Drafts only; Tyler approves anything outbound.",
+      "adapterType": "claude_local",
+      "adapterConfig": {
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "engine": "cli"
+      }
+    },
+    {
+      "file": "claims-review.AGENTS.md",
+      "name": "Claims Review",
+      "role": "qa",
+      "title": "Claims Review & Compliance",
+      "capabilities": "Reviews claim deliverables before they reach Tyler or a carrier: checks estimates, supplements, forms and carrier letters for factual accuracy against the claim file, policy support for each item, math, Texas public-adjuster rules and deadlines. Approves or returns work with specific fixes; never contacts anyone.",
+      "adapterType": "codex_local",
+      "adapterConfig": {
+        "model": "gpt-5.5",
+        "extraArgs": [
+          "-c",
+          "model_reasoning_effort=\"high\""
+        ]
+      }
+    },
+    {
+      "file": "growth.AGENTS.md",
+      "name": "Growth",
+      "role": "cmo",
+      "title": "Growth & Partnerships",
+      "capabilities": "Builds TBM's contractor referral pipeline: researches Central Texas roofing and restoration contractors, drafts outreach emails, follow-ups and call scripts in Tyler's voice, and writes website and marketing content checked against Texas solicitation rules. Drafts only.",
+      "adapterType": "claude_local",
+      "adapterConfig": {
+        "model": "claude-opus-5-5",
+        "effort": "medium",
+        "engine": "cli"
+      }
+    }
+  ]
+}
