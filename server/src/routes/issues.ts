@@ -254,6 +254,11 @@ import {
 } from "../attachment-types.js";
 import { retainBacklogHumanAssignment } from "../services/human-directed-work.js";
 import { queueIssueAssignmentWakeup } from "../services/issue-assignment-wakeup.js";
+import {
+  createTypeSafeIssueRouter,
+  readTypeSafeIssueRouterConfig,
+  type TypeSafeIssueRouter,
+} from "../services/typesafe-issue-router.js";
 import { shouldWakeAssigneeForIssueComment } from "../services/issue-comment-wakeup.js";
 import { createSecretProposalsService } from "../services/secret-proposals.js";
 import { notifySecretProposalResolution } from "../services/secret-proposal-notifications.js";
@@ -3493,6 +3498,7 @@ export function issueRoutes(
       options: Parameters<ReturnType<typeof heartbeatService>["wakeup"]>[1],
     ) => ReturnType<ReturnType<typeof heartbeatService>["wakeup"]>;
     issueListDiagnostics?: IssueListDiagnostics;
+    issueRouter?: TypeSafeIssueRouter;
     declineToolActionRequest?: (input: {
       companyId: string;
       issueId?: string;
@@ -3526,6 +3532,14 @@ export function issueRoutes(
   const heartbeat = heartbeatService(db, {
     pluginWorkerManager: opts.pluginWorkerManager,
   });
+  const issueRouter =
+    opts.issueRouter ??
+    createTypeSafeIssueRouter({
+      db,
+      config: readTypeSafeIssueRouterConfig(),
+      issues: svc,
+      heartbeat,
+    });
   const commentWasCreatedByAssigneeRun = async (
     comment: { companyId: string; createdByRunId?: string | null },
     assigneeAgentId: string | null | undefined,
@@ -11990,6 +12004,51 @@ export function issueRoutes(
         });
       }
       await queueTaskWatchdogEvaluation(issue, actor.runId);
+
+      // Unassigned issues are routed to an agent in the background when the
+      // TypeSafe router is enabled. Creation never waits on or fails because
+      // of routing, and routing only assigns where this creator could have.
+      if (
+        issueRouter.enabled &&
+        !isOnboardingFirstTask &&
+        !issue.assigneeAgentId &&
+        !issue.assigneeUserId
+      ) {
+        const createStatusDefault = res.locals.createIssueStatusDefault as
+          | ReturnType<typeof resolveCreateIssueStatusDefault>
+          | undefined;
+        const creatorActorType = req.actor.type;
+        void issueRouter
+          .routeNewIssue({
+            issueId: issue.id,
+            companyId,
+            statusWasDefaulted:
+              createStatusDefault?.reason === "unassigned_omitted_status",
+            canAssign: async (agentId) => {
+              try {
+                await assertNoAgentDelegationCycle({
+                  actorType: creatorActorType,
+                  parentIssueId: createBody.parentId ?? null,
+                  assigneeAgentId: agentId,
+                });
+                await assertCanAssignTasks(req, companyId, {
+                  ...createAssignmentScope,
+                  assigneeAgentId: agentId,
+                  assigneeUserId: null,
+                });
+                return true;
+              } catch {
+                return false;
+              }
+            },
+          })
+          .catch((err) => {
+            logger.warn(
+              { err, issueId: issue.id, companyId },
+              "automatic issue routing failed",
+            );
+          });
+      }
 
       res.status(201).json({
         ...issue,
