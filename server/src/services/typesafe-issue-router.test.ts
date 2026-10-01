@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Db } from "@paperclipai/db";
+import { sanitizeRecord } from "../redaction.js";
 import {
   NO_SUITABLE_AGENT,
   buildOptionKeys,
@@ -341,11 +342,18 @@ describe("createTypeSafeIssueRouter", () => {
         actorId: "typesafe-router",
         details: expect.objectContaining({
           agentName: "Founding Engineer",
-          model: "jev-1.13.0",
+          model: "jev-1.13.0 (TypeSafe)",
           statusChanged: { from: "backlog", to: "todo" },
         }),
       }),
     );
+    // What the activity feed shows after redaction keeps the model readable.
+    const loggedDetails = (activity.mock.calls[0] as unknown as [{ details: Record<string, unknown> }])[0]
+      .details;
+    expect(sanitizeRecord(loggedDetails)).toMatchObject({
+      model: "jev-1.13.0 (TypeSafe)",
+      agentName: "Founding Engineer",
+    });
     expect(wakeup).toHaveBeenCalledWith(
       engineerId,
       expect.objectContaining({ source: "assignment", reason: "issue_assigned" }),

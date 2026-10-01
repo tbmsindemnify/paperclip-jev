@@ -538,7 +538,9 @@ export function createTypeSafeIssueRouter(deps: TypeSafeIssueRouterDeps) {
     }
 
     const details = {
-      model: response.model,
+      // Activity redaction masks dotted, JWT-shaped strings such as
+      // "jev-1.13.0"; the suffix keeps the versioned model ID readable.
+      model: `${response.model} (TypeSafe)`,
       candidateCount: candidates.length,
       agentId: decision.agentId,
       agentName: decision.agentId ? (nameById.get(decision.agentId) ?? null) : null,
